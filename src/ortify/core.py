@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import onnxruntime as ort
 import torch
 import torch.nn as nn
@@ -63,7 +62,9 @@ class OrtifyWrapper(nn.Module):
         self._session = ort.InferenceSession(str(self._onnx_path), **session_args)
         self._output_names = [o.name for o in self._session.get_outputs()]
 
-    def forward(self, *args: torch.Tensor, **kwargs: Any) -> torch.Tensor | tuple[torch.Tensor, ...]:
+    def forward(
+        self, *args: torch.Tensor, **kwargs: Any
+    ) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """Run forward pass, using ONNX Runtime if enabled."""
         if not self._args.ort_enabled:
             return self._module(*args, **kwargs)
