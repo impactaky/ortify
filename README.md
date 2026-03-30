@@ -5,15 +5,16 @@ Wrap PyTorch modules to run on ONNX Runtime.
 ## Installation
 
 ```bash
-pip install ortify
+uv add ortify
 ```
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-pre-commit install
-pre-commit run --all-files
+uv sync --extra dev
+uv run pre-commit install
+uv run pre-commit run --all-files
+uv run --extra dev ruff check .
 ```
 
 ## Usage
