@@ -18,6 +18,7 @@ class OrtifyArgs:
     ort_enabled: bool = True
     export_path: Path | str | None = None
     opset_version: int = 17
+    onnxruntime_args: dict[str, Any] = field(default_factory=dict)
 
 
 class OrtifyWrapper(nn.Module):
@@ -57,10 +58,9 @@ class OrtifyWrapper(nn.Module):
                 do_constant_folding=True,
             )
 
-        self._session = ort.InferenceSession(
-            str(self._onnx_path),
-            providers=["CPUExecutionProvider"],
-        )
+        session_args = dict(self._args.onnxruntime_args)
+        session_args.setdefault("providers", ["CPUExecutionProvider"])
+        self._session = ort.InferenceSession(str(self._onnx_path), **session_args)
         self._output_names = [o.name for o in self._session.get_outputs()]
 
     def forward(self, *args: torch.Tensor, **kwargs: Any) -> torch.Tensor | tuple[torch.Tensor, ...]:

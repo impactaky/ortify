@@ -20,3 +20,12 @@ wrapped = ortify(model, args)
 
 output = wrapped(torch.randn(1, 10))  # Runs on ONNX Runtime
 ```
+
+Pass ONNX Runtime session arguments through `onnxruntime_args` when needed:
+
+```python
+args = OrtifyArgs(
+    ort_enabled=True,
+    onnxruntime_args={"providers": ["CPUExecutionProvider"]},
+)
+```

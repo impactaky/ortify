@@ -32,13 +32,19 @@ class TestOrtify:
         wrapped = ortify(model)
         assert wrapped._args.ort_enabled is True
         assert wrapped._args.opset_version == 17
+        assert wrapped._args.onnxruntime_args == {}
 
     def test_custom_args(self):
         model = SimpleModel()
-        args = OrtifyArgs(ort_enabled=False, opset_version=14)
+        args = OrtifyArgs(
+            ort_enabled=False,
+            opset_version=14,
+            onnxruntime_args={"providers": ["CPUExecutionProvider"]},
+        )
         wrapped = ortify(model, args)
         assert wrapped._args.ort_enabled is False
         assert wrapped._args.opset_version == 14
+        assert wrapped._args.onnxruntime_args == {"providers": ["CPUExecutionProvider"]}
 
 
 class TestOrtifyWrapper:
@@ -101,6 +107,45 @@ class TestOrtifyWrapper:
         output = wrapped(x)
 
         assert output.shape == (4, 5)
+
+    def test_bypasses_onnxruntime_args_to_inference_session(self, monkeypatch):
+        captured: dict[str, object] = {}
+
+        class DummyOutput:
+            def __init__(self, name):
+                self.name = name
+
+        class DummySession:
+            def __init__(self, path, **kwargs):
+                captured["path"] = path
+                captured["kwargs"] = kwargs
+
+            def get_outputs(self):
+                return [DummyOutput("output_0")]
+
+            def run(self, output_names, inputs):
+                return [inputs["input_0"]]
+
+        def fake_export(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
+        monkeypatch.setattr("ortify.core.ort.InferenceSession", DummySession)
+
+        model = SimpleModel()
+        args = OrtifyArgs(
+            onnxruntime_args={
+                "providers": ["AzureExecutionProvider"],
+                "sess_options": object(),
+            }
+        )
+        wrapped = ortify(model, args)
+
+        x = torch.randn(2, 10)
+        output = wrapped(x)
+
+        assert torch.equal(output, x)
+        assert captured["kwargs"] == args.onnxruntime_args
 
 
 class TestMultipleInputs:
