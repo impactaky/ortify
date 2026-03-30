@@ -8,6 +8,14 @@ Wrap PyTorch modules to run on ONNX Runtime.
 pip install ortify
 ```
 
+## Development
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
+pre-commit run --all-files
+```
+
 ## Usage
 
 ```python
