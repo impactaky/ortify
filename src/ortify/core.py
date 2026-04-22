@@ -55,6 +55,7 @@ class OrtifyWrapper(nn.Module):
                 input_names=self._input_names,
                 opset_version=self._args.opset_version,
                 do_constant_folding=True,
+                dynamo=False,
             )
 
         session_args = dict(self._args.onnxruntime_args)
