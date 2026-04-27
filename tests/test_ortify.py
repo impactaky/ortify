@@ -32,6 +32,7 @@ class TestOrtify:
         wrapped = ortify(model)
         assert wrapped._args.ort_enabled is True
         assert wrapped._args.opset_version == 17
+        assert wrapped._args.quantize is False
         assert wrapped._args.onnxruntime_args == {}
 
     def test_custom_args(self):
@@ -39,11 +40,13 @@ class TestOrtify:
         args = OrtifyArgs(
             ort_enabled=False,
             opset_version=14,
+            quantize=True,
             onnxruntime_args={"providers": ["CPUExecutionProvider"]},
         )
         wrapped = ortify(model, args)
         assert wrapped._args.ort_enabled is False
         assert wrapped._args.opset_version == 14
+        assert wrapped._args.quantize is True
         assert wrapped._args.onnxruntime_args == {"providers": ["CPUExecutionProvider"]}
 
 
@@ -97,6 +100,54 @@ class TestOrtifyWrapper:
             wrapped(x)
 
             assert export_path.exists()
+
+    def test_quantize_outputs_quantized_export_path(self, monkeypatch):
+        captured: dict[str, object] = {}
+
+        class DummyOutput:
+            def __init__(self, name):
+                self.name = name
+
+        class DummySession:
+            def __init__(self, path, **kwargs):
+                captured["session_path"] = Path(path)
+                captured["session_kwargs"] = kwargs
+
+            def get_outputs(self):
+                return [DummyOutput("output_0")]
+
+            def run(self, output_names, inputs):
+                return [inputs["input_0"]]
+
+        def fake_export(module, args, path, **kwargs):
+            captured["export_path"] = Path(path)
+            Path(path).write_bytes(b"float onnx")
+
+        def fake_quantize_dynamic(model_input, model_output, **kwargs):
+            captured["quantize_input"] = Path(model_input)
+            captured["quantize_output"] = Path(model_output)
+            captured["quantize_kwargs"] = kwargs
+            Path(model_output).write_bytes(b"quantized onnx")
+
+        monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
+        monkeypatch.setattr("ortify.core.quantize_dynamic", fake_quantize_dynamic)
+        monkeypatch.setattr("ortify.core.ort.InferenceSession", DummySession)
+
+        model = SimpleModel()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            export_path = Path(tmpdir) / "model.onnx"
+            args = OrtifyArgs(ort_enabled=True, export_path=export_path, quantize=True)
+            wrapped = ortify(model, args)
+
+            x = torch.randn(2, 10)
+            output = wrapped(x)
+
+            assert torch.equal(output, x)
+            assert export_path.read_bytes() == b"quantized onnx"
+            assert captured["export_path"] != export_path
+            assert captured["quantize_input"] == captured["export_path"]
+            assert captured["quantize_output"] == export_path
+            assert captured["session_path"] == export_path
 
     def test_output_shape_matches(self):
         model = SimpleModel()

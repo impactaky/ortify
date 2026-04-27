@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -8,6 +9,11 @@ from typing import Any
 import onnxruntime as ort
 import torch
 import torch.nn as nn
+from onnxruntime.quantization import QuantType, quantize_dynamic
+
+
+def _torch_onnx_export_supports_dynamo() -> bool:
+    return "dynamo" in inspect.signature(torch.onnx.export).parameters
 
 
 @dataclass
@@ -17,6 +23,7 @@ class OrtifyArgs:
     ort_enabled: bool = True
     export_path: Path | str | None = None
     opset_version: int = 17
+    quantize: bool = False
     onnxruntime_args: dict[str, Any] = field(default_factory=dict)
 
 
@@ -44,17 +51,36 @@ class OrtifyWrapper(nn.Module):
             self._temp_dir = tempfile.TemporaryDirectory()
             self._onnx_path = Path(self._temp_dir.name) / "model.onnx"
 
+        export_path = self._onnx_path
+        if self._args.quantize:
+            if self._temp_dir is None:
+                self._temp_dir = tempfile.TemporaryDirectory()
+            export_path = Path(self._temp_dir.name) / "model.float.onnx"
+
         self._input_names = [f"input_{i}" for i in range(len(args))]
 
         self._module.eval()
+        export_kwargs = {
+            "input_names": self._input_names,
+            "opset_version": self._args.opset_version,
+            "do_constant_folding": True,
+        }
+        if self._args.quantize and _torch_onnx_export_supports_dynamo():
+            export_kwargs["dynamo"] = False
+
         with torch.no_grad():
             torch.onnx.export(
                 self._module,
                 args,
+                str(export_path),
+                **export_kwargs,
+            )
+
+        if self._args.quantize:
+            quantize_dynamic(
+                str(export_path),
                 str(self._onnx_path),
-                input_names=self._input_names,
-                opset_version=self._args.opset_version,
-                do_constant_folding=True,
+                weight_type=QuantType.QInt8,
             )
 
         session_args = dict(self._args.onnxruntime_args)
