@@ -80,6 +80,10 @@ class OrtifyWrapper(nn.Module):
             quantize_dynamic(
                 str(export_path),
                 str(self._onnx_path),
+                input_names=self._input_names,
+                opset_version=self._args.opset_version,
+                do_constant_folding=True,
+                dynamo=False,
                 weight_type=QuantType.QInt8,
             )
 

@@ -178,6 +178,7 @@ class TestOrtifyWrapper:
                 return [inputs["input_0"]]
 
         def fake_export(*args, **kwargs):
+            captured["export_kwargs"] = kwargs
             return None
 
         monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
@@ -197,6 +198,7 @@ class TestOrtifyWrapper:
 
         assert torch.equal(output, x)
         assert captured["kwargs"] == args.onnxruntime_args
+        assert captured["export_kwargs"]["dynamo"] is False
 
 
 class TestMultipleInputs:
