@@ -181,7 +181,9 @@ class TestOrtifyWrapper:
             captured["export_kwargs"] = kwargs
             return None
 
-        monkeypatch.setattr("ortify.core._torch_onnx_export_supports_dynamo", lambda: True)
+        monkeypatch.setattr(
+            "ortify.core._torch_onnx_export_supports_dynamo", lambda: True
+        )
         monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
         monkeypatch.setattr("ortify.core.ort.InferenceSession", DummySession)
 
@@ -223,7 +225,9 @@ class TestOrtifyWrapper:
             captured["export_kwargs"] = kwargs
             return None
 
-        monkeypatch.setattr("ortify.core._torch_onnx_export_supports_dynamo", lambda: True)
+        monkeypatch.setattr(
+            "ortify.core._torch_onnx_export_supports_dynamo", lambda: True
+        )
         monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
         monkeypatch.setattr("ortify.core.ort.InferenceSession", DummySession)
 
