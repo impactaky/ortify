@@ -181,6 +181,9 @@ class TestOrtifyWrapper:
             captured["export_kwargs"] = kwargs
             return None
 
+        monkeypatch.setattr(
+            "ortify.core._torch_onnx_export_supports_dynamo", lambda: True
+        )
         monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
         monkeypatch.setattr("ortify.core.ort.InferenceSession", DummySession)
 
@@ -198,6 +201,43 @@ class TestOrtifyWrapper:
 
         assert torch.equal(output, x)
         assert captured["kwargs"] == args.onnxruntime_args
+        assert captured["export_kwargs"]["dynamo"] is False
+
+    def test_disables_dynamo_export_when_supported(self, monkeypatch):
+        captured: dict[str, object] = {}
+
+        class DummyOutput:
+            def __init__(self, name):
+                self.name = name
+
+        class DummySession:
+            def __init__(self, path, **kwargs):
+                captured["path"] = path
+                captured["kwargs"] = kwargs
+
+            def get_outputs(self):
+                return [DummyOutput("output_0")]
+
+            def run(self, output_names, inputs):
+                return [inputs["input_0"]]
+
+        def fake_export(*args, **kwargs):
+            captured["export_kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr(
+            "ortify.core._torch_onnx_export_supports_dynamo", lambda: True
+        )
+        monkeypatch.setattr("ortify.core.torch.onnx.export", fake_export)
+        monkeypatch.setattr("ortify.core.ort.InferenceSession", DummySession)
+
+        model = SimpleModel()
+        wrapped = ortify(model, OrtifyArgs())
+
+        x = torch.randn(2, 10)
+        output = wrapped(x)
+
+        assert torch.equal(output, x)
         assert captured["export_kwargs"]["dynamo"] is False
 
 
