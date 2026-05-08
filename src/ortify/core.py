@@ -66,7 +66,7 @@ class OrtifyWrapper(nn.Module):
             "do_constant_folding": True,
         }
 
-        if self._args.quantize and _torch_onnx_export_supports_dynamo():
+        if _torch_onnx_export_supports_dynamo():
             export_kwargs["dynamo"] = False
 
         with torch.no_grad():
